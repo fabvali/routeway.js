@@ -14,9 +14,6 @@
   "author": "verleihernix",
   "license": "MIT",
   "description": "An easy-to-use API Wrapper for the ClashAI Api.",
-  "dependencies": {
-    "axios": "^1.7.5"
-  },
   "files": [
     "lib"
   ],
