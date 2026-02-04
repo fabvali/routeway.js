@@ -80,6 +80,9 @@ export interface StreamCallbacks {
   onDone?: () => void;
 }
 
+type NonStreamingOptions = Omit<CreateCompletionOptions, 'stream'> & { stream?: false | undefined };
+type StreamingOptions = CreateCompletionOptions & { stream: true };
+
 class Completions {
   private readonly apiKey: string;
   private readonly baseUrl: string;
@@ -89,14 +92,9 @@ class Completions {
     this.baseUrl = baseUrl;
   }
 
-  public async create(
-    options: Omit<CreateCompletionOptions, 'stream'> | (CreateCompletionOptions & { stream: false })
-  ): Promise<CompletionResponse>;
+  public async create(options: NonStreamingOptions): Promise<CompletionResponse>;
   
-  public async create(
-    options: CreateCompletionOptions & { stream: true },
-    callbacks: StreamCallbacks
-  ): Promise<void>;
+  public async create(options: StreamingOptions, callbacks: StreamCallbacks): Promise<void>;
   
   public async create(
     options: CreateCompletionOptions,
@@ -126,7 +124,11 @@ class Completions {
         throw new Error("No response body for streaming");
       }
       
-      await this.handleStreamingResponse(response.body, callbacks || {});
+      if (!callbacks) {
+        throw new Error("Callbacks are required for streaming");
+      }
+      
+      await this.handleStreamingResponse(response.body, callbacks);
       return;
     }
 
@@ -201,7 +203,7 @@ class Completions {
   }
 
   public async *createIterator(
-    options: CreateCompletionOptions & { stream: true }
+    options: StreamingOptions
   ): AsyncGenerator<CompletionChunk, void, unknown> {
     const endpoint = "v1/chat/completions";
     const url = `${this.baseUrl}/${endpoint}`;
