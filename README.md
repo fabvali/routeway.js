@@ -4,12 +4,11 @@
 
 ## Features
 
-- 🎯 **Full TypeScript Support** - Complete type definitions
-- 🚀 **OpenAI-Compatible API** - Drop-in replacement for OpenAI SDK
-- 💬 **Chat Completions** - Non-streaming and streaming responses
-- 🧠 **Reasoning Models** - Support for DeepSeek-R1 with reasoning traces
-- 📝 **Model Management** - List available models
-- 🔒 **Type-Safe** - Comprehensive typing for all API responses
+- **Full TypeScript Support** - Complete type definitions
+- **OpenAI-Compatible API** - Drop-in replacement for OpenAI SDK
+- **Chat Completions** - Non-streaming and streaming responses
+- **Reasoning Models** - Support for DeepSeek-R1 with reasoning traces
+- **Model Management** - List available models
 
 ## Installation
 
