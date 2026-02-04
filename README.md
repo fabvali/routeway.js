@@ -1,4 +1,4 @@
-# Routeway.js
+# Routeway.js (unofficial)
 
 > A modern TypeScript/JavaScript wrapper for the [Routeway API](https://routeway.ai)
 
