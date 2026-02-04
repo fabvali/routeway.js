@@ -4,7 +4,7 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "directories": {
-    "lib": "lib"https://github.com/fabvali/routeway.js/blob/main/package.json
+    "lib": "lib"
   },
   "keywords": [
     "api-wrapper",
