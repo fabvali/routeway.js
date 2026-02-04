@@ -80,9 +80,6 @@ export interface StreamCallbacks {
   onDone?: () => void;
 }
 
-// Helper type to ensure literal type inference
-type StreamOptions<T extends boolean> = Omit<CreateCompletionOptions, 'stream'> & { stream: T };
-
 class Completions {
   private readonly apiKey: string;
   private readonly baseUrl: string;
@@ -92,18 +89,15 @@ class Completions {
     this.baseUrl = baseUrl;
   }
 
-  // Non-streaming overload
   public async create(
-    options: StreamOptions<false> | (Omit<CreateCompletionOptions, 'stream'> & { stream?: undefined })
+    options: Omit<CreateCompletionOptions, 'stream'> | (CreateCompletionOptions & { stream: false })
   ): Promise<CompletionResponse>;
   
-  // Streaming overload - requires callbacks
   public async create(
-    options: StreamOptions<true>,
+    options: CreateCompletionOptions & { stream: true },
     callbacks: StreamCallbacks
   ): Promise<void>;
   
-  // Implementation
   public async create(
     options: CreateCompletionOptions,
     callbacks?: StreamCallbacks
@@ -207,7 +201,7 @@ class Completions {
   }
 
   public async *createIterator(
-    options: StreamOptions<true>
+    options: CreateCompletionOptions & { stream: true }
   ): AsyncGenerator<CompletionChunk, void, unknown> {
     const endpoint = "v1/chat/completions";
     const url = `${this.baseUrl}/${endpoint}`;
