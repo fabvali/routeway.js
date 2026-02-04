@@ -6,6 +6,10 @@ interface ChatMessage {
 interface CompletionRequest {
   model: string;
   messages: ChatMessage[];
+  temperature?: number;
+  max_tokens?: number;
+  top_p?: number;
+  stream?: boolean;
 }
 
 interface CompletionResponse {
@@ -45,6 +49,15 @@ interface ModelResponse {
   data: Model[];
 }
 
+interface CreateCompletionOptions {
+  model: string;
+  messages: ChatMessage[];
+  temperature?: number;
+  max_tokens?: number;
+  top_p?: number;
+  stream?: boolean;
+}
+
 class Completions {
   private readonly apiKey: string;
   private readonly baseUrl: string;
@@ -55,12 +68,10 @@ class Completions {
   }
 
   public async create(
-    messages: ChatMessage[],
-    model = "chatgpt-4o-latest"
+    options: CreateCompletionOptions
   ): Promise<CompletionResponse> {
     const endpoint = "v1/chat/completions";
     const url = `${this.baseUrl}/${endpoint}`;
-    const playload: CompletionRequest = { model, messages };
 
     const response = await fetch(url, {
       method: "POST",
@@ -68,7 +79,7 @@ class Completions {
         Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(playload),
+      body: JSON.stringify(options),
     });
 
     if (!response.ok) {
@@ -80,6 +91,7 @@ class Completions {
 
 class Chat {
   public readonly completions: Completions;
+  
   public constructor(apiKey: string, baseUrl: string) {
     this.completions = new Completions(apiKey, baseUrl);
   }
@@ -96,10 +108,11 @@ export class Client {
     this.chat = new Chat(this.apiKey, this.baseUrl);
   }
 
-  public async modelsPromise<ModelResponse> {
+  public async models(): Promise<ModelResponse> {
     const endpoint = "v1/models";
     const url = `${this.baseUrl}/${endpoint}`;
     const response = await fetch(url);
+    
     if (!response.ok) {
       throw new Error(`Failed to fetch models: ${response.statusText}`);
     }
