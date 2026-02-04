@@ -1,8 +1,20 @@
-interface ChatMessage {
+export interface ChatMessage {
     role: "system" | "user" | "assistant";
     content: string;
 }
-interface CompletionResponse {
+
+export interface CreateCompletionOptions {
+    model: string;
+    messages: ChatMessage[];
+    temperature?: number;
+    max_tokens?: number;
+    top_p?: number;
+    frequency_penalty?: number;
+    presence_penalty?: number;
+    stream?: boolean;
+}
+
+export interface CompletionResponse {
     id: string;
     object: string;
     created: number;
@@ -16,11 +28,12 @@ interface CompletionResponse {
     choices: {
         index: number;
         message: ChatMessage;
-        logprobs: string;
+        logprobs: string | null;
         finish_reason: string;
     }[];
 }
-interface Model {
+
+export interface Model {
     id: string;
     object: string;
     created: number;
@@ -32,20 +45,24 @@ interface Model {
         Enterprise: boolean;
     };
 }
-interface ModelResponse {
+
+export interface ModelResponse {
     object: string;
     data: Model[];
 }
+
 declare class Completions {
     private readonly apiKey;
     private readonly baseUrl;
     constructor(apiKey: string, baseUrl: string);
-    create(messages: ChatMessage[], model?: string): Promise<CompletionResponse>;
+    create(options: CreateCompletionOptions): Promise<CompletionResponse>;
 }
+
 declare class Chat {
     readonly completions: Completions;
     constructor(apiKey: string, baseUrl: string);
 }
+
 export declare class Client {
     private readonly apiKey;
     private readonly baseUrl;
@@ -53,4 +70,3 @@ export declare class Client {
     constructor(apiKey: string, baseUrl?: string);
     models(): Promise<ModelResponse>;
 }
-export {};
