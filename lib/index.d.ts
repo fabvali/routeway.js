@@ -2,7 +2,6 @@ export interface ChatMessage {
     role: "system" | "user" | "assistant";
     content: string;
 }
-
 export interface CreateCompletionOptions {
     model: string;
     messages: ChatMessage[];
@@ -13,7 +12,6 @@ export interface CreateCompletionOptions {
     presence_penalty?: number;
     stream?: boolean;
 }
-
 export interface CompletionResponse {
     id: string;
     object: string;
@@ -32,7 +30,6 @@ export interface CompletionResponse {
         finish_reason: string;
     }[];
 }
-
 export interface Model {
     id: string;
     object: string;
@@ -45,24 +42,20 @@ export interface Model {
         Enterprise: boolean;
     };
 }
-
 export interface ModelResponse {
     object: string;
     data: Model[];
 }
-
 declare class Completions {
     private readonly apiKey;
     private readonly baseUrl;
     constructor(apiKey: string, baseUrl: string);
     create(options: CreateCompletionOptions): Promise<CompletionResponse>;
 }
-
 declare class Chat {
     readonly completions: Completions;
     constructor(apiKey: string, baseUrl: string);
 }
-
 export declare class Client {
     private readonly apiKey;
     private readonly baseUrl;
@@ -70,3 +63,4 @@ export declare class Client {
     constructor(apiKey: string, baseUrl?: string);
     models(): Promise<ModelResponse>;
 }
+export {};
