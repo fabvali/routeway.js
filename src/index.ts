@@ -92,11 +92,11 @@ export class Client {
 
   public constructor(apiKey: string, baseUrl?: string) {
     this.apiKey = apiKey;
-    this.baseUrl = baseUrl ?? "https://api.clashai.eu";
+    this.baseUrl = baseUrl ?? "https://api.routeway.ai";
     this.chat = new Chat(this.apiKey, this.baseUrl);
   }
 
-  public async models(): Promise<ModelResponse> {
+  public async modelsPromise<ModelResponse> {
     const endpoint = "v1/models";
     const url = `${this.baseUrl}/${endpoint}`;
     const response = await fetch(url);
