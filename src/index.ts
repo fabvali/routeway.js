@@ -1,3 +1,5 @@
+import { EventEmitter } from "events";
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
@@ -72,34 +74,61 @@ export interface ModelResponse {
   data: Model[];
 }
 
-export interface StreamCallbacks {
-  onChunk?: (chunk: CompletionChunk) => void;
-  onContent?: (content: string) => void;
-  onReasoning?: (reasoning: string) => void;
-  onError?: (error: Error) => void;
-  onDone?: () => void;
+type NonStreamingOptions = Omit<CreateCompletionOptions, "stream"> & {
+  stream?: false | undefined;
+};
+
+type StreamingOptions = CreateCompletionOptions & {
+  stream: true;
+};
+
+
+export interface StreamEvents {
+  chunk: (chunk: CompletionChunk) => void;
+  content: (content: string) => void;
+  reasoning: (reasoning: string) => void;
+  error: (error: Error) => void;
+  done: () => void;
 }
 
-type NonStreamingOptions = Omit<CreateCompletionOptions, 'stream'> & { stream?: false | undefined };
-type StreamingOptions = CreateCompletionOptions & { stream: true };
-
-class Completions {
-  private readonly apiKey: string;
-  private readonly baseUrl: string;
-
-  public constructor(apiKey: string, baseUrl: string) {
-    this.apiKey = apiKey;
-    this.baseUrl = baseUrl;
+export class CompletionStream extends EventEmitter {
+  public emit<K extends keyof StreamEvents>(
+    event: K,
+    ...args: Parameters<StreamEvents[K]>
+  ): boolean {
+    return super.emit(event, ...args);
   }
 
-  public async create(options: NonStreamingOptions): Promise<CompletionResponse>;
-  
-  public async create(options: StreamingOptions, callbacks: StreamCallbacks): Promise<void>;
-  
+  public on<K extends keyof StreamEvents>(
+    event: K,
+    listener: StreamEvents[K]
+  ): this {
+    return super.on(event, listener);
+  }
+
+  public once<K extends keyof StreamEvents>(
+    event: K,
+    listener: StreamEvents[K]
+  ): this {
+    return super.once(event, listener);
+  }
+}
+
+class Completions {
+
+  public constructor(private readonly apiKey: string, private readonly baseUrl: string) {}
+
   public async create(
-    options: CreateCompletionOptions,
-    callbacks?: StreamCallbacks
-  ): Promise<CompletionResponse | void> {
+    options: NonStreamingOptions
+  ): Promise<CompletionResponse>;
+
+  public async create(
+    options: StreamingOptions
+  ): Promise<CompletionStream>;
+
+  public async create(
+    options: CreateCompletionOptions
+  ): Promise<CompletionResponse | CompletionStream> {
     const endpoint = "v1/chat/completions";
     const url = `${this.baseUrl}/${endpoint}`;
 
@@ -123,13 +152,14 @@ class Completions {
       if (!response.body) {
         throw new Error("No response body for streaming");
       }
-      
-      if (!callbacks) {
-        throw new Error("Callbacks are required for streaming");
-      }
-      
-      await this.handleStreamingResponse(response.body, callbacks);
-      return;
+
+      const stream = new CompletionStream();
+
+      this.handleStreamingResponse(response.body, stream).catch((err) =>
+        stream.emit("error", err)
+      );
+
+      return stream;
     }
 
     return response.json() as Promise<CompletionResponse>;
@@ -137,7 +167,7 @@ class Completions {
 
   private async handleStreamingResponse(
     body: ReadableStream<Uint8Array>,
-    callbacks: StreamCallbacks
+    emitter: CompletionStream
   ): Promise<void> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
@@ -146,62 +176,57 @@ class Completions {
     try {
       while (true) {
         const { done, value } = await reader.read();
-        
         if (done) break;
-        
+
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        
         buffer = lines.pop() || "";
-        
+
         for (const line of lines) {
-          await this.processLine(line.trim(), callbacks);
+          this.processLine(line.trim(), emitter);
         }
       }
-      
+
       if (buffer.trim()) {
-        await this.processLine(buffer.trim(), callbacks);
+        this.processLine(buffer.trim(), emitter);
       }
-      
-      callbacks.onDone?.();
-      
+
+      emitter.emit("done");
     } catch (error) {
-      callbacks.onError?.(error instanceof Error ? error : new Error(String(error)));
-      throw error;
+      emitter.emit(
+        "error",
+        error instanceof Error ? error : new Error(String(error))
+      );
     } finally {
       reader.releaseLock();
     }
   }
 
-  private async processLine(
+  private processLine(
     line: string,
-    callbacks: StreamCallbacks
-  ): Promise<void> {
+    emitter: CompletionStream
+  ): void {
     if (!line || line.startsWith(":")) return;
-    
     if (!line.startsWith("data: ")) return;
-    
+
     const data = line.slice(6).trim();
-    
-    if (data === "[DONE]") {
-      return;
-    }
-    
+    if (data === "[DONE]") return;
+
     try {
       const chunk: CompletionChunk = JSON.parse(data);
-      callbacks.onChunk?.(chunk);
-      
+      emitter.emit("chunk", chunk);
+
       const delta = chunk.choices[0]?.delta;
-      
+
       if (delta?.content) {
-        callbacks.onContent?.(delta.content);
+        emitter.emit("content", delta.content);
       }
-      
+
       if (delta?.reasoning_content) {
-        callbacks.onReasoning?.(delta.reasoning_content);
+        emitter.emit("reasoning", delta.reasoning_content);
       }
     } catch (error) {
-      console.warn("Failed to parse chunk:", line);
+      console.warn("Failed to parse chunk: ", error);
     }
   }
 
@@ -238,43 +263,31 @@ class Completions {
     try {
       while (true) {
         const { done, value } = await reader.read();
-        
         if (done) break;
-        
+
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
-        
+
         for (const line of lines) {
           const trimmed = line.trim();
-          if (!trimmed || trimmed.startsWith(":") || !trimmed.startsWith("data: ")) continue;
-          
+          if (
+            !trimmed ||
+            trimmed.startsWith(":") ||
+            !trimmed.startsWith("data: ")
+          )
+            continue;
+
           const data = trimmed.slice(6).trim();
           if (data === "[DONE]") return;
-          
+
           try {
             const chunk: CompletionChunk = JSON.parse(data);
             yield chunk;
-          } catch {
-          }
+          } catch {}
         }
       }
-      
-      if (buffer.trim()) {
-        const trimmed = buffer.trim();
-        if (trimmed.startsWith("data: ")) {
-          const data = trimmed.slice(6).trim();
-          if (data !== "[DONE]") {
-            try {
-              const chunk: CompletionChunk = JSON.parse(data);
-              yield chunk;
-            } catch {
-            }
-          }
-        }
-      }
-      
-    } finally {
+    } catch {} finally {
       reader.releaseLock();
     }
   }
@@ -289,13 +302,9 @@ class Chat {
 }
 
 export class Client {
-  private readonly apiKey: string;
-  private readonly baseUrl: string;
   public readonly chat: Chat;
 
-  public constructor(apiKey: string, baseUrl?: string) {
-    this.apiKey = apiKey;
-    this.baseUrl = baseUrl ?? "https://api.routeway.ai";
+  public constructor(private readonly apiKey: string, private readonly baseUrl = "https://api.routeway.ai") {
     this.chat = new Chat(this.apiKey, this.baseUrl);
   }
 
